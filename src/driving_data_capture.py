@@ -16,8 +16,8 @@ from geometry_msgs.msg import Twist
 rospy.init_node('topic_publisher')
 
 directory = '/home/fizzer/ros_ws/src/comp_controller/src/labelled_driving_data'
-current_im = np.zeros((300,300,1))
-
+x = 0
+z = 0
 
 
 
@@ -42,6 +42,7 @@ def callback_im(data):
 
 
 def callback_vel(data):
+	global cmd_vel
 	cmd_vel = data
 	x = cmd_vel.linear.x
 	z = cmd_vel.angular.z
