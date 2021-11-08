@@ -9,6 +9,7 @@ from sensor_msgs.msg import Image
 from cv_bridge import CvBridge
 import os
 import time
+from datetime import datetime
 
 from geometry_msgs.msg import Twist
 
@@ -18,44 +19,49 @@ rospy.init_node('topic_publisher')
 directory = '/home/fizzer/ros_ws/src/comp_controller/src/labelled_driving_data'
 x = 0
 z = 0
+i = 0
 
+cur_date = datetime.now()
+cur_date_str = cur_date.strftime('%m-%d-%Y-%H:%M')
+print(cur_date_str)
 
 
 def callback_im(data):
-	# global i
-	
 
-	# if(i == 10):
-	bridge = CvBridge()
-	cv_image = bridge.imgmsg_to_cv2(data, desired_encoding='passthrough')
+	if x != 0 and z != 0:
+		global i
+		global directory
+		global cur_date_str
 
-	# 	os.chdir(directory)
+		im_num = str(i)
 
-	# 	cv2.imwrite("test.png", cv_image)
+		im_num_len = len(im_num)
 
-	# 	i = 0
+		if im_num_len == 1:
+			im_num = "000" + im_num
+		elif im_num_len == 2:
+			im_num = "00" + im_num
+		elif im_num_len == 3:
+			im_num = "0" + im_num
 
-	# else:
-	# 	i += 1
-	global current_im
-	current_im = cv_image
+
+		bridge = CvBridge()
+		cv_image = bridge.imgmsg_to_cv2(data, desired_encoding='passthrough')
+
+		os.chdir(directory)
+
+		im_name = cur_date_str + '_' + im_num + '_x:' + str(x) + ',z:' + str(z) + '.png'
+
+		cv2.imwrite(im_name, cv_image)
+		i += 1
 
 
 def callback_vel(data):
-	global cmd_vel
+	global x
+	global z
 	cmd_vel = data
 	x = cmd_vel.linear.x
 	z = cmd_vel.angular.z
-
-	global directory
-	global current_im
-
-
-	os.chdir(directory)
-
-	im_name = 'x:' + str(x) + ',z:' + str(z) + '.png'
-
-	cv2.imwrite(im_name, current_im)
 
 
 image_sub = rospy.Subscriber('/R1/pi_camera/image_raw', Image, callback_im)
