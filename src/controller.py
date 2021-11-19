@@ -9,6 +9,7 @@ import cv2
 import numpy as np
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge
+import os
 
 
 # %tensorflow_version 1.14.0
@@ -29,7 +30,8 @@ license_pub = rospy.Publisher('/license_plate', String, queue_size=1)
 vel_pub = rospy.Publisher('/R1/cmd_vel', Twist, queue_size=1)
 rate = rospy.Rate(2)
 
-cnn_path = "/home/fizzer/ros_ws/src/comp_controller/src/imitation_learning_model"
+cur_dir = os.getcwd()
+cnn_path = cur_dir + "/imitation_learning_model"
 
 cnn = models.load_model(cnn_path)\
 

@@ -16,7 +16,9 @@ from geometry_msgs.msg import Twist
 # rate = rospy.Rate(2)
 rospy.init_node('topic_publisher')
 
-directory = '/home/fizzer/ros_ws/src/comp_controller/src/labelled_driving_data'
+
+cur_dir = os.getcwd()
+directory = cur_dir + '/labelled_driving_data'
 x = 0
 z = 0
 i = 0
