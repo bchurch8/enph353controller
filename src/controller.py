@@ -82,9 +82,8 @@ def callback_im(data):
 		processed_img = image_processing(cv_image)
 
 
-		test_list = list()
-		test_list.append(processed_img)
-		X = np.float32(np.expand_dims(np.asarray(test_list),3))
+		im_array = np.array(processed_img)
+		X = np.float32(np.expand_dims(im_array,3))
 		pred = cnn.predict(X)
 		i = np.argmax(pred,axis=1)[0]
 
