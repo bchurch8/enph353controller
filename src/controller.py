@@ -31,14 +31,16 @@ vel_pub = rospy.Publisher('/R1/cmd_vel', Twist, queue_size=1)
 rate = rospy.Rate(2)
 
 cur_dir = os.getcwd()
-cnn_path = cur_dir + "/imitation_learning_model"
+# cnn_path = cur_dir + "/im_NN_scale 25_11-19-2021-06 39"
 
-cnn = models.load_model(cnn_path)\
+cnn_path = '/home/fizzer/ros_ws/src/enph353controller/src/im_NN_scale 25_11-19-2021-06 39'
+cnn = models.load_model(cnn_path)
 
 print("NN loaded")
 
 x_mag = 0.075
 z_mag = 0.387
+loop = 0
 
 time.sleep(1)
 
@@ -57,9 +59,9 @@ time.sleep(1)
 
 def image_processing(image):
 	scale_percent = 25
-	gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-	width = int(img.shape[1] * scale_percent / 100)
-	height = int(img.shape[0] * scale_percent / 100)
+	gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+	width = int(image.shape[1] * scale_percent / 100)
+	height = int(image.shape[0] * scale_percent / 100)
 	dim = (width,height)
 	scaled = cv2.resize(gray,dim)
 	normal = scaled/255
