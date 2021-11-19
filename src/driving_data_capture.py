@@ -19,6 +19,8 @@ rospy.init_node('topic_publisher')
 
 cur_dir = os.getcwd()
 directory = cur_dir + '/labelled_driving_data'
+os.chdir(directory)
+
 x = 0
 z = 0
 i = 0
@@ -26,6 +28,10 @@ i = 0
 cur_date = datetime.now()
 cur_date_str = cur_date.strftime('%m-%d-%Y-%H:%M')
 print("Ready to record driving data")
+
+img_dir = directory + '/' + cur_date_str
+
+os.mkdir(img_dir)
 
 
 def callback_im(data):
@@ -50,7 +56,7 @@ def callback_im(data):
 		bridge = CvBridge()
 		cv_image = bridge.imgmsg_to_cv2(data, desired_encoding='passthrough')
 
-		os.chdir(directory)
+		os.chdir(img_dir)
 
 		im_name = cur_date_str + '_' + im_num + '_x:' + str(x) + ',z:' + str(z) + '.png'
 
