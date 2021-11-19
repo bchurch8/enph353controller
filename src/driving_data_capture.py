@@ -23,12 +23,12 @@ i = 0
 
 cur_date = datetime.now()
 cur_date_str = cur_date.strftime('%m-%d-%Y-%H:%M')
-print(cur_date_str)
+print("Ready to record driving data")
 
 
 def callback_im(data):
 
-	if x != 0 and z != 0:
+	if x != 0:
 		global i
 		global directory
 		global cur_date_str
