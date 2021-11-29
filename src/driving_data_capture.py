@@ -55,12 +55,13 @@ def callback_im(data):
 
 		bridge = CvBridge()
 		cv_image = bridge.imgmsg_to_cv2(data, desired_encoding='passthrough')
+		gray_image = cv2.cvtColor(cv_image, cv2.COLOR_BGR2GRAY)
 
 		os.chdir(img_dir)
 
-		im_name = cur_date_str + '_' + im_num + '_x:' + str(x) + ',z:' + str(z) + '.png'
+		im_name = im_num + '_x:' + str(x) + ',z:' + str(z) + '.png'
 
-		cv2.imwrite(im_name, cv_image)
+		cv2.imwrite(im_name, gray_image)
 		i += 1
 
 

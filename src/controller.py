@@ -10,17 +10,20 @@ import numpy as np
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge
 import os
+import sys
 
 
 # %tensorflow_version 1.14.0
 
-from tensorflow.keras import layers
+import tensorflow as tf
 from tensorflow.keras import models
-from tensorflow.keras import optimizers
+from tensorflow.python.keras.backend import set_session
+from tensorflow.python.keras.models import load_model
 
-from tensorflow.keras.utils import plot_model
-from tensorflow.keras import backend
-from tensorflow.keras import models
+sess1 = tf.Session()    
+graph1 = tf.get_default_graph()
+set_session(sess1)
+
 
 # roslib.load_manifest('2020_competition')
 
@@ -33,25 +36,37 @@ rate = rospy.Rate(2)
 cur_dir = os.getcwd()
 # cnn_path = cur_dir + "/im_NN_scale 25_11-19-2021-06 39"
 
-cnn_path = '/home/fizzer/ros_ws/src/enph353controller/src/im_NN_scale 25_11-19-2021-06 39'
+# cnn_path = "/home/fizzer/ros_ws/src/enph35controller/src/im_NN_scale 25_11-19-2021-06 39"
+cnn_path = '/home/fizzer/ros_ws/src/enph35controller/src/scale_25_02_data_pipeline_update'
 cnn = models.load_model(cnn_path)
 
-print("NN loaded")
+print("NN loaded, path: ", cnn_path)
 
 x_mag = 0.075
 z_mag = 0.387
 loop = 0
 
-time.sleep(1)
+# time.sleep(1)
 
 license_pub.publish('Team,1234,0,WRXT')
 
-time.sleep(1)
+# time.sleep(1)
 
 
-# move = Twist()
-# move.linear.x = 0.3
-# move.angular.z = 0.6
+# start_move = Twist()
+# start_move.linear.x = x_mag
+# start_move.angular.z = z_mag
+
+# stop = Twist()
+# stop.linear.x = 0
+# stop.angular.z = 0
+
+# vel_pub.publish(start_move)
+# time.sleep(0.3)
+# vel_pub.publish(stop)
+# time.sleep(0.2)
+
+
 
 # for i in range(10):
 # 	vel_pub.publish(move)
@@ -77,7 +92,11 @@ def callback_im(data):
 
 	loop += 1
 
-	if loop < 1000:
+	if loop < 300:
+
+		if loop % 20 == 0:
+			print("loop number:", loop)
+
 
 		bridge = CvBridge()
 		cv_image = bridge.imgmsg_to_cv2(data, desired_encoding='passthrough')
@@ -90,7 +109,14 @@ def callback_im(data):
 		test_list = list()
 		test_list.append(processed_img)
 		X = np.float32(np.expand_dims(np.asarray(test_list),3))
-		pred = cnn.predict(X)
+
+
+		global sess1
+		global graph1 
+		with graph1.as_default():
+   			set_session(sess1)
+   			pred = cnn.predict(X)
+
 		i = np.argmax(pred,axis=1)[0]
 
 		if i == 0:
@@ -109,6 +135,7 @@ def callback_im(data):
 
 	else:
 		license_pub.publish('Team1,1234,-1,WRXT')
+		sys.exit(0)
 
 
 
@@ -116,7 +143,7 @@ def callback_im(data):
 
 image_sub = rospy.Subscriber('/R1/pi_camera/image_raw', Image, callback_im)
 
-while loop < 1000:
+while loop < 300:
 	rospy.spin()
 
 
