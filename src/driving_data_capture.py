@@ -36,7 +36,8 @@ os.mkdir(img_dir)
 
 def callback_im(data):
 
-	if x != 0:
+	# if z != 0:
+	if not (x == 0 and z == 0):
 		global i
 		global directory
 		global cur_date_str
