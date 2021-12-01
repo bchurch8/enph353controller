@@ -66,8 +66,8 @@ def set_move(lin_x,ang_z):
 
 #Global Variables
 
-x_mag = 0.15
 #initial was 0.075 x and 0.30 z
+x_mag = 0.15
 z_mag = 0.30
 
 cross_time = time.time()
@@ -84,6 +84,8 @@ left = set_move(0, z_mag)
 right = set_move(0, -z_mag)
 stop = set_move(0,0)
 crossing = False
+
+save_photos = True
 
 #Function Definitions
 
@@ -271,10 +273,11 @@ def callback_im(data):
 					plate_time = time.time()
 					# cv2.imshow(str(plate.shape),plate)
 					# cv2.waitKey(1)
-					img_dir = "/home/fizzer/ros_ws/src/enph35controller/src/plate_pictures"
-					os.chdir(img_dir)
-					im_name = str(whitepix) + str(plate_width) + str(plate_height) + ".png"
-					cv2.imwrite(im_name, plate)
+					if save_photos:
+						img_dir = "/home/fizzer/ros_ws/src/enph35controller/src/plate_pictures"
+						os.chdir(img_dir)
+						im_name = str(whitepix) + str(plate_width) + str(plate_height) + ".png"
+						cv2.imwrite(im_name, plate)
 				
 
 			bot_cropped = cv_image[2*third:height,:]
