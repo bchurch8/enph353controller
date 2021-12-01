@@ -85,7 +85,9 @@ right = set_move(0, -z_mag)
 stop = set_move(0,0)
 crossing = False
 
-save_photos = True
+save_photos = False
+
+team_name_pass = "Walmart,Tesla"
 
 #Function Definitions
 
@@ -232,7 +234,8 @@ def cropped_plate(image):
 		plate = image[y:y+h-5, x:x+w-5]
 		return plate
 	else:
-		return np.zeros(1,1)
+		dim = (1,1)
+		return np.zeros(dim)
 
 def callback_im(data):
 
@@ -250,7 +253,9 @@ def callback_im(data):
 	if not lap_complete:
 
 		if(rospy.get_time() - start_time > lap_time):
-			license_pub.publish('Team1,1234,-1,WRXT')
+			global team_name_pass
+			license_stop = team_name_pass + ",-1,WMTL"
+			license_pub.publish(license_stop)
 			lap_complete = True
 			vel_pub.publish(stop)
 		else:
@@ -339,7 +344,8 @@ def callback_im(data):
 				vel_pub.publish(move)
 
 
-license_pub.publish('Team,1234,0,WRXT')
+license_start = team_name_pass + ",0,WMTL"
+license_pub.publish(license_start)
 
 vel_pub.publish(straight)
 rospy.sleep(0.5)
