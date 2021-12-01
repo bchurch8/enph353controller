@@ -176,12 +176,6 @@ def car_thresh(image):
 	width = image.shape[1]
 	im_crop = image[int(height/2):height,0:int(width/2)]
 
-	# cv2.imshow('',im_crop)
-	# cv2.waitKey(1)
-
-	# Crop the image to include only bottom left section
-	# im_crop = image[300:720, 0:600]
-
 	# Convert the RGB image to HSV
 	image_HSV = cv2.cvtColor(im_crop, cv2.COLOR_RGB2HSV)
 
@@ -198,8 +192,6 @@ def car_thresh(image):
 
 	# Threshold the HSV image to  only get the car
 	car_mask = cv2.inRange(image_HSV, lower_hsv, upper_hsv)
-	# cv2.imshow('',car_mask)
-	# cv2.waitKey(1)
 
 	number_of_white_pix = np.sum(car_mask == 255)
 	return (number_of_white_pix,im_crop)
@@ -230,14 +222,15 @@ def cropped_plate(image):
 	# Get Contour
 	im, contours, hierarchy = cv2.findContours(opening,cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 
-
+	if(len(contours) > 0):
 	# Get Plate Location
-	x,y,w,h = cv2.boundingRect(contours[0])
+		x,y,w,h = cv2.boundingRect(contours[0])
 
 	# Hard coded -5 to get nicer crop
-	plate = image[y:y+h-5, x:x+w-5]
-
-	return plate
+		plate = image[y:y+h-5, x:x+w-5]
+		return plate
+	else:
+		return np.zeros(1,1)
 
 def callback_im(data):
 
@@ -268,11 +261,21 @@ def callback_im(data):
 			whitepix,crop_car = car_thresh(cv_image)
 
 			if (whitepix>27000 and (time.time() - plate_time > 8)):
-				plate_time = time.time()
-				print("Plate detected")
+				print("Car detected")
 				plate = cropped_plate(crop_car)
-				cv2.imshow('',plate)
-				cv2.waitKey(1)
+				plate_height = plate.shape[0]
+				plate_width = plate.shape[1]
+
+				if (plate_width > 85) and (plate_height > 20):
+					print("Plate detected")
+					plate_time = time.time()
+					# cv2.imshow(str(plate.shape),plate)
+					# cv2.waitKey(1)
+					img_dir = "/home/fizzer/ros_ws/src/enph35controller/src/plate_pictures"
+					os.chdir(img_dir)
+					im_name = str(whitepix) + str(plate_width) + str(plate_height) + ".png"
+					cv2.imwrite(im_name, plate)
+				
 
 			bot_cropped = cv_image[2*third:height,:]
 			bot_thresh = sidewalk_thresh(bot_cropped)
