@@ -48,9 +48,8 @@ cur_dir = os.getcwd()
 #and turns early on corners with cross walks
 # cnn_name = "/05_croppedL 1063,S 2498" # always goes straight -> too much S data
 # cnn_name = "/06_croppedL 1063,S 2000" #MAKES IT AROUND 2ND CORNER SOMETIMES
-# cnn_name = "/07_croppedL 1063,S 1750" #Corners decently well but still randomly turns into other features
-#^best so far
-cnn_name = "/08_croppedL 1391,S 2499" #Makes it all the way around sometimes!!
+cnn_name = "/07_croppedL 1063,S 1750" #Corners decently well but still randomly turns into other features
+# cnn_name = "/08_croppedL 1391,S 2499" #Makes it all the way around sometimes!!
 
 cnn_path = cur_dir + cnn_name
 
