@@ -48,8 +48,8 @@ cur_dir = os.getcwd()
 #and turns early on corners with cross walks
 # cnn_name = "/05_croppedL 1063,S 2498" # always goes straight -> too much S data
 # cnn_name = "/06_croppedL 1063,S 2000" #MAKES IT AROUND 2ND CORNER SOMETIMES
-cnn_name = "/07_croppedL 1063,S 1750" #Corners decently well but still randomly turns into other features
-# cnn_name = "/08_croppedL 1391,S 2499" #Makes it all the way around sometimes!!
+# cnn_name = "/07_croppedL 1063,S 1750" #Corners decently well but still randomly turns into other features
+cnn_name = "/08_croppedL 1391,S 2499" #Makes it all the way around sometimes!!
 
 cnn_path = cur_dir + cnn_name
 
@@ -72,6 +72,8 @@ z_mag = 0.30
 
 cross_time = time.time()
 cross_wait = False
+
+plate_time = time.time()
 
 start_time = rospy.get_time()
 lap_complete = False
@@ -168,6 +170,75 @@ def ped_detector(top_cross_thresh):
     
   return False
 
+
+def car_thresh(image):
+	height = image.shape[0]
+	width = image.shape[1]
+	im_crop = image[int(height/2):height,0:int(width/2)]
+
+	# cv2.imshow('',im_crop)
+	# cv2.waitKey(1)
+
+	# Crop the image to include only bottom left section
+	# im_crop = image[300:720, 0:600]
+
+	# Convert the RGB image to HSV
+	image_HSV = cv2.cvtColor(im_crop, cv2.COLOR_RGB2HSV)
+
+	  #HSV filter to identify car
+	uh = 141
+	us = 255
+	uv = 218
+	lh = 92
+	ls = 100
+	lv = 90
+
+	lower_hsv = np.array([lh,ls,lv])
+	upper_hsv = np.array([uh,us,uv])
+
+	# Threshold the HSV image to  only get the car
+	car_mask = cv2.inRange(image_HSV, lower_hsv, upper_hsv)
+	# cv2.imshow('',car_mask)
+	# cv2.waitKey(1)
+
+	number_of_white_pix = np.sum(car_mask == 255)
+	return (number_of_white_pix,im_crop)
+
+def cropped_plate(image):
+	# Convert the RGB image to HSV
+	image_HSV = cv2.cvtColor(image, cv2.COLOR_RGB2HSV)
+
+	#HSV filter to identify plate
+	uh = 170
+	us = 200
+	uv = 194
+	lh = 100
+	ls = 0
+	lv = 50
+	lower_hsv = np.array([lh,ls,lv])
+	upper_hsv = np.array([uh,us,uv])
+
+	# Threshold the HSV image to get only the plate
+	plate_mask = cv2.inRange(image_HSV, lower_hsv, upper_hsv)
+
+	# Prime plate for contouring
+	kernel = 255 * np.ones((4,4),np.uint8)
+	erosion = cv2.erode(plate_mask,kernel,iterations = 1)
+	dilation = cv2.dilate(erosion, kernel, iterations = 2)
+	opening = cv2.morphologyEx(dilation, cv2.MORPH_OPEN, kernel)
+
+	# Get Contour
+	im, contours, hierarchy = cv2.findContours(opening,cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+
+
+	# Get Plate Location
+	x,y,w,h = cv2.boundingRect(contours[0])
+
+	# Hard coded -5 to get nicer crop
+	plate = image[y:y+h-5, x:x+w-5]
+
+	return plate
+
 def callback_im(data):
 
 	global cnn
@@ -179,6 +250,7 @@ def callback_im(data):
 	global cross_wait
 	global start_time
 	global lap_complete
+	global plate_time
 
 	if not lap_complete:
 
@@ -193,9 +265,20 @@ def callback_im(data):
 			height = cv_image.shape[0]
 			third = int (height /3)
 
+			whitepix,crop_car = car_thresh(cv_image)
+
+			if (whitepix>27000 and (time.time() - plate_time > 8)):
+				plate_time = time.time()
+				print("Plate detected")
+				plate = cropped_plate(crop_car)
+				cv2.imshow('',plate)
+				cv2.waitKey(1)
+
 			bot_cropped = cv_image[2*third:height,:]
 			bot_thresh = sidewalk_thresh(bot_cropped)
 			sidewalk_pres = sidewalk_detector(bot_thresh)
+
+
 
 			if cross_wait:
 				top_cropped = cv_image[third:2*third,:]
