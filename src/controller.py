@@ -31,7 +31,6 @@ set_session(sess1)
 rospy.init_node('topic_publisher')
 license_pub = rospy.Publisher('/license_plate', String, queue_size=1)
 vel_pub = rospy.Publisher('/R1/cmd_vel', Twist, queue_size=1)
-rate = rospy.Rate(2)
 
 cur_dir = os.getcwd()
 # cnn_path = cur_dir + "/im_NN_scale 25_11-19-2021-06 39"
@@ -51,25 +50,13 @@ cur_dir = os.getcwd()
 # cnn_name = "/06_croppedL 1063,S 2000" #MAKES IT AROUND 2ND CORNER SOMETIMES
 # cnn_name = "/07_croppedL 1063,S 1750" #Corners decently well but still randomly turns into other features
 #^best so far
-cnn_name = "/08_croppedL 1391,S 2499"
+cnn_name = "/08_croppedL 1391,S 2499" #Makes it all the way around sometimes!!
 
 cnn_path = cur_dir + cnn_name
 
 cnn = models.load_model(cnn_path)
 
 print("NN loaded, path: ", cnn_path)
-
-x_mag = 0.075
-z_mag = 0.30
-loop = 0
-loop_count = 600
-cross_time = time.time()
-
-# time.sleep(1)
-
-license_pub.publish('Team,1234,0,WRXT')
-
-# time.sleep(1)
 
 def set_move(lin_x,ang_z):
 	move = Twist()
@@ -78,20 +65,26 @@ def set_move(lin_x,ang_z):
 
 	return move
 
+#Global Variables
+
+x_mag = 0.15
+#initial was 0.075 x and 0.30 z
+z_mag = 0.30
+
+cross_time = time.time()
+cross_wait = False
+
+start_time = rospy.get_time()
+lap_complete = False
+lap_time = 111
+
 straight = set_move(x_mag, 0)
 left = set_move(0, z_mag)
 right = set_move(0, -z_mag)
 stop = set_move(0,0)
 crossing = False
 
-vel_pub.publish(straight)
-time.sleep(0.5)
-
-vel_pub.publish(left)
-time.sleep(0.5)
-
-
-vel_pub.publish(stop)
+#Function Definitions
 
 def image_processing(image):
 
@@ -112,11 +105,8 @@ def image_processing(image):
 	return normal
 
 def sidewalk_thresh(image):
-	# Convert the BRG image to HSV
-	height = image.shape[0]
-	cropped = image[int(2*height/3):height,:]
-	
-	image_HSV = cv2.cvtColor(cropped, cv2.COLOR_RGB2HSV)
+	# Convert the RGB image to HSV
+	image_HSV = cv2.cvtColor(image, cv2.COLOR_RGB2HSV)
 
 	#HSV filter to identify the walk
 	uh = 0
@@ -130,9 +120,32 @@ def sidewalk_thresh(image):
 
 	# Threshold the HSV image to  only get the sidewalk
 	walk_mask = cv2.inRange(image_HSV, lower_hsv, upper_hsv)
-	# cv2.imshow('', walk_mask)
-	# cv2.waitKey(1)
-	return walk_mask
+
+	kernel2 = 255 * np.ones((5,5),np.uint8)
+	dilation = cv2.dilate(walk_mask, kernel2, iterations = 1)
+	return dilation
+
+def pedestrian_thresh(image):
+
+  image_HSV = cv2.cvtColor(image, cv2.COLOR_RGB2HSV)
+
+  uh = 152
+  us = 255
+  uv = 117
+  lh = 86
+  ls = 45
+  lv = 0
+  lower_hsv = np.array([lh,ls,lv])
+  upper_hsv = np.array([uh,us,uv])
+
+  pedestrian_thresh = cv2.inRange(image_HSV, lower_hsv, upper_hsv)
+  kernel = 255 * np.ones((5,5),np.uint8)
+  opening = cv2.morphologyEx(pedestrian_thresh, cv2.MORPH_OPEN, kernel)
+  kernel2 = 255 * np.ones((6,6),np.uint8)
+  dilation = cv2.dilate(opening, kernel2, iterations = 1)
+
+  return dilation
+	
 
 def sidewalk_detector(thresh_im):
 	im, contours, hierarchy = cv2.findContours(thresh_im,cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
@@ -143,94 +156,114 @@ def sidewalk_detector(thresh_im):
 	x,y,w,h = cv2.boundingRect(contours[0])
 
 	if (thresh_im.shape[0] - (y+h)) < 60 and w*h > 50000:
-	# if (thresh_im.shape[0] - (y+h)) < 60 :
-		# print(thresh_im.shape[0] - (y+h))
-		# print(w*h)
 		return True
 	
 	else:
 		return False
 
+def ped_detector(top_cross_thresh):
+  im, cross_contours, cross_hierarchy = cv2.findContours(top_cross_thresh,cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+
+  if(len(cross_contours) >= 2):
+    return True
+    
+  return False
+
 def callback_im(data):
 
 	global cnn
-	global loop 
 	global stop
 	global straight
 	global left
 	global right
 	global cross_time
+	global cross_wait
+	global start_time
+	global lap_complete
 
-	bridge = CvBridge()
-	cv_image = bridge.imgmsg_to_cv2(data, desired_encoding='passthrough')
-	thresh = sidewalk_thresh(cv_image)
-	sidewalk_pres = sidewalk_detector(thresh)
+	if not lap_complete:
 
-	if(sidewalk_pres and (time.time() - cross_time > 4)):
-		print("Sidewalk detected")
-		cross_time = time.time()
-		
-		vel_pub.publish(stop)
-		rospy.sleep(1)
-		vel_pub.publish(set_move(2*x_mag, 0))
-		rospy.sleep(3)
-		vel_pub.publish(stop)
+		if(rospy.get_time() - start_time > lap_time):
+			license_pub.publish('Team1,1234,-1,WRXT')
+			lap_complete = True
+			vel_pub.publish(stop)
+		else:
+			bridge = CvBridge()
+			cv_image = bridge.imgmsg_to_cv2(data, desired_encoding='passthrough')
 
-		
+			height = cv_image.shape[0]
+			third = int (height /3)
 
+			bot_cropped = cv_image[2*third:height,:]
+			bot_thresh = sidewalk_thresh(bot_cropped)
+			sidewalk_pres = sidewalk_detector(bot_thresh)
 
-	else:
+			if cross_wait:
+				top_cropped = cv_image[third:2*third,:]
+				cross_thresh = sidewalk_thresh(top_cropped)
+				ped_pres = ped_detector(cross_thresh)
 
-		processed_img = image_processing(cv_image)
-
-		# im_array = np.array(processed_img)
-		# X = np.float32(np.expand_dims(im_array,3))
-
-
-		test_list = list()
-		test_list.append(processed_img)
-		X = np.float32(np.expand_dims(np.asarray(test_list),3))
-
-
-		global sess1
-		global graph1 
-		with graph1.as_default():
-				set_session(sess1)
-				pred = cnn.predict(X)
-
-		i = np.argmax(pred,axis=1)[0]
-
-		if i == 0:
-			move = left
-			# x = 0
-			# z = z_mag
-		elif i == 1:
-			move = straight
-			# x = x_mag
-			# z = 0
-		elif i == 2:
-			move = right
-			# z = -z_mag
-			# x = 0
-
-		# move = Twist()
-		# move.linear.x = x
-		# move.angular.z = z
-
-		vel_pub.publish(move)
+				if(ped_pres):
+					print("Pedestrian detected")
+					rospy.sleep(0.5)
+					vel_pub.publish(set_move(2*x_mag,0))
+					rospy.sleep(1)
+					vel_pub.publish(stop)
+					cross_wait = False
+				elif((time.time() - cross_time) > 4):
+					print("Time elapsed, moving forward")
+					rospy.sleep(1)
+					vel_pub.publish(set_move(3*x_mag,0))
+					rospy.sleep(1)
+					vel_pub.publish(stop)
+					cross_wait = False
+			elif (sidewalk_pres and (time.time() - cross_time > 8)):
+				print("Sidewalk detected")
+				cross_time = time.time()
+				cross_wait = True
+				vel_pub.publish(stop)
 
 
-		# if loop == loop_count:
-		# 	license_pub.publish('Team1,1234,-1,WRXT')
-		
+			else:
+				processed_img = image_processing(cv_image)
+
+				test_list = list()
+				test_list.append(processed_img)
+				X = np.float32(np.expand_dims(np.asarray(test_list),3))
+
+				global sess1
+				global graph1 
+				with graph1.as_default():
+						set_session(sess1)
+						pred = cnn.predict(X)
+
+				i = np.argmax(pred,axis=1)[0]
+
+				if i == 0:
+					move = left
+					# x = 0
+					# z = z_mag
+				elif i == 1:
+					move = straight
+				elif i == 2:
+					move = right
+
+				vel_pub.publish(move)
 
 
+license_pub.publish('Team,1234,0,WRXT')
 
+vel_pub.publish(straight)
+rospy.sleep(0.5)
 
+vel_pub.publish(left)
+rospy.sleep(0.5)
+vel_pub.publish(stop)
 
 image_sub = rospy.Subscriber('/R1/pi_camera/image_raw', Image, callback_im, queue_size = 1)
 
-while loop < loop_count:
+
+while True:
 	rospy.spin()
 
 
