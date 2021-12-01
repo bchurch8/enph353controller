@@ -36,34 +36,34 @@ os.mkdir(img_dir)
 
 def callback_im(data):
 
-	# if z != 0:
-	if not (x == 0 and z == 0):
-		global i
-		global directory
-		global cur_date_str
+		if z != 0:
+		# if not (x == 0 and z == 0):
+			global i
+			global directory
+			global cur_date_str
 
-		im_num = str(i)
+			im_num = str(i)
 
-		im_num_len = len(im_num)
+			im_num_len = len(im_num)
 
-		if im_num_len == 1:
-			im_num = "000" + im_num
-		elif im_num_len == 2:
-			im_num = "00" + im_num
-		elif im_num_len == 3:
-			im_num = "0" + im_num
+			if im_num_len == 1:
+				im_num = "000" + im_num
+			elif im_num_len == 2:
+				im_num = "00" + im_num
+			elif im_num_len == 3:
+				im_num = "0" + im_num
 
 
-		bridge = CvBridge()
-		cv_image = bridge.imgmsg_to_cv2(data, desired_encoding='passthrough')
-		gray_image = cv2.cvtColor(cv_image, cv2.COLOR_BGR2GRAY)
+			bridge = CvBridge()
+			cv_image = bridge.imgmsg_to_cv2(data, desired_encoding='passthrough')
+			gray_image = cv2.cvtColor(cv_image, cv2.COLOR_BGR2GRAY)
 
-		os.chdir(img_dir)
+			os.chdir(img_dir)
 
-		im_name = im_num + '_x:' + str(x) + ',z:' + str(z) + '.png'
+			im_name = im_num + '_x:' + str(x) + ',z:' + str(z) + '.png'
 
-		cv2.imwrite(im_name, gray_image)
-		i += 1
+			cv2.imwrite(im_name, gray_image)
+			i += 1
 
 
 def callback_vel(data):

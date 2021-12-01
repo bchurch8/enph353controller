@@ -22,14 +22,25 @@ license_pub.publish('Team,1234,0,WRXT')
 
 time.sleep(1)
 
+x_mag = 0.075
+z_mag = 0.30
 
-move = Twist()
-move.linear.x = 0.3
-move.angular.z = 0.6
+start_straight = Twist()
+start_straight.linear.x = x_mag
+start_straight.angular.z = 0
 
-for i in range(10):
-	vel_pub.publish(move)
-	time.sleep(1)
+stop = Twist()
+stop.linear.x = 0
+stop.angular.z = 0
+
+
+vel_pub.publish(start_straight)
+time.sleep(2)
+vel_pub.publish(stop)
+
+# for i in range(10):
+# 	vel_pub.publish(move)
+# 	time.sleep(1)
 
 license_pub.publish('Team1,1234,-1,WRXT')
 

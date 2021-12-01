@@ -49,7 +49,10 @@ cur_dir = os.getcwd()
 #and turns early on corners with cross walks
 # cnn_name = "/05_croppedL 1063,S 2498" # always goes straight -> too much S data
 # cnn_name = "/06_croppedL 1063,S 2000" #MAKES IT AROUND 2ND CORNER SOMETIMES
-cnn_name = "/07_croppedL 1063,S 1750" #Corners decently well but still randomly turns into other features
+# cnn_name = "/07_croppedL 1063,S 1750" #Corners decently well but still randomly turns into other features
+#^best so far
+cnn_name = "/08_croppedL 1391,S 2499"
+
 cnn_path = cur_dir + cnn_name
 
 cnn = models.load_model(cnn_path)
@@ -57,9 +60,10 @@ cnn = models.load_model(cnn_path)
 print("NN loaded, path: ", cnn_path)
 
 x_mag = 0.075
-z_mag = 0.387
+z_mag = 0.30
 loop = 0
 loop_count = 600
+cross_time = time.time()
 
 # time.sleep(1)
 
@@ -67,36 +71,27 @@ license_pub.publish('Team,1234,0,WRXT')
 
 # time.sleep(1)
 
+def set_move(lin_x,ang_z):
+	move = Twist()
+	move.linear.x = lin_x
+	move.angular.z = ang_z
 
-start_move = Twist()
-start_move.linear.x = x_mag
-start_move.angular.z = 0
+	return move
 
-vel_pub.publish(start_move)
+straight = set_move(x_mag, 0)
+left = set_move(0, z_mag)
+right = set_move(0, -z_mag)
+stop = set_move(0,0)
+crossing = False
+
+vel_pub.publish(straight)
 time.sleep(0.5)
 
-start_move.linear.x = 0
-start_move.angular.z = z_mag
-vel_pub.publish(start_move)
+vel_pub.publish(left)
 time.sleep(0.5)
-
-stop = Twist()
-stop.linear.x = 0
-stop.angular.z = 0
 
 
 vel_pub.publish(stop)
-
-
-# def image_processing(image):
-# 	scale_percent = 25
-# 	gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-# 	width = int(image.shape[1] * scale_percent / 100)
-# 	height = int(image.shape[0] * scale_percent / 100)
-# 	dim = (width,height)
-# 	scaled = cv2.resize(gray,dim)
-# 	normal = scaled/255
-# 	return normal
 
 def image_processing(image):
 
@@ -116,24 +111,76 @@ def image_processing(image):
 
 	return normal
 
+def sidewalk_thresh(image):
+	# Convert the BRG image to HSV
+	height = image.shape[0]
+	cropped = image[int(2*height/3):height,:]
+	
+	image_HSV = cv2.cvtColor(cropped, cv2.COLOR_RGB2HSV)
+
+	#HSV filter to identify the walk
+	uh = 0
+	us = 255
+	uv = 255
+	lh = 0
+	ls = 30
+	lv = 150
+	lower_hsv = np.array([lh,ls,lv])
+	upper_hsv = np.array([uh,us,uv])
+
+	# Threshold the HSV image to  only get the sidewalk
+	walk_mask = cv2.inRange(image_HSV, lower_hsv, upper_hsv)
+	# cv2.imshow('', walk_mask)
+	# cv2.waitKey(1)
+	return walk_mask
+
+def sidewalk_detector(thresh_im):
+	im, contours, hierarchy = cv2.findContours(thresh_im,cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+
+	if len(contours) < 1:
+		return False
+
+	x,y,w,h = cv2.boundingRect(contours[0])
+
+	if (thresh_im.shape[0] - (y+h)) < 60 and w*h > 50000:
+	# if (thresh_im.shape[0] - (y+h)) < 60 :
+		# print(thresh_im.shape[0] - (y+h))
+		# print(w*h)
+		return True
+	
+	else:
+		return False
 
 def callback_im(data):
 
 	global cnn
-	global z_mag
-	global x_mag
 	global loop 
+	global stop
+	global straight
+	global left
+	global right
+	global cross_time
 
-	loop += 1
+	bridge = CvBridge()
+	cv_image = bridge.imgmsg_to_cv2(data, desired_encoding='passthrough')
+	thresh = sidewalk_thresh(cv_image)
+	sidewalk_pres = sidewalk_detector(thresh)
 
-	if loop < loop_count:
+	if(sidewalk_pres and (time.time() - cross_time > 4)):
+		print("Sidewalk detected")
+		cross_time = time.time()
+		
+		vel_pub.publish(stop)
+		rospy.sleep(1)
+		vel_pub.publish(set_move(2*x_mag, 0))
+		rospy.sleep(3)
+		vel_pub.publish(stop)
 
-		# if loop % 20 == 0:
-		# 	print("loop number:", loop)
+		
 
 
-		bridge = CvBridge()
-		cv_image = bridge.imgmsg_to_cv2(data, desired_encoding='passthrough')
+	else:
+
 		processed_img = image_processing(cv_image)
 
 		# im_array = np.array(processed_img)
@@ -148,37 +195,40 @@ def callback_im(data):
 		global sess1
 		global graph1 
 		with graph1.as_default():
-   			set_session(sess1)
-   			pred = cnn.predict(X)
+				set_session(sess1)
+				pred = cnn.predict(X)
 
 		i = np.argmax(pred,axis=1)[0]
 
 		if i == 0:
-			x = 0
-			z = z_mag
+			move = left
+			# x = 0
+			# z = z_mag
 		elif i == 1:
-			x = x_mag
-			z = 0
+			move = straight
+			# x = x_mag
+			# z = 0
 		elif i == 2:
-			z = -z_mag
-			x = 0
+			move = right
+			# z = -z_mag
+			# x = 0
 
-		move = Twist()
-		move.linear.x = x
-		move.angular.z = z
+		# move = Twist()
+		# move.linear.x = x
+		# move.angular.z = z
 
 		vel_pub.publish(move)
 
 
-	if loop == loop_count:
-		license_pub.publish('Team1,1234,-1,WRXT')
-		loop +=1
+		# if loop == loop_count:
+		# 	license_pub.publish('Team1,1234,-1,WRXT')
+		
 
 
 
 
 
-image_sub = rospy.Subscriber('/R1/pi_camera/image_raw', Image, callback_im)
+image_sub = rospy.Subscriber('/R1/pi_camera/image_raw', Image, callback_im, queue_size = 1)
 
 while loop < loop_count:
 	rospy.spin()
